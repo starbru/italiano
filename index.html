@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>意大利语单词朗读</title>
+    <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid black; padding: 10px; text-align: left; }
+        button { padding: 5px 10px; cursor: pointer; }
+        .highlight { background-color: yellow; } /* 重点标记 */
+        .category { font-weight: bold; background-color: lightgray; text-align: center; } /* 标题栏样式 */
+    </style>
+</head>
+<body>
+    <h2>意大利语单词朗读</h2>
+    <input type="file" id="fileInput" accept=".csv">
+    <button onclick="clearData()">清除数据</button>
+    <table id="wordTable">
+        <tr>
+            <th>中文</th>
+            <th>意大利语</th>
+            <th>朗读</th>
+            <th>标记重点</th>
+        </tr>
+    </table>
+
+    <script>
+        function speak(text) {
+            var msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'it-IT';
+            window.speechSynthesis.speak(msg);
+        }
+
+        function saveData(words) {
+            localStorage.setItem('savedWords', JSON.stringify(words));
+        }
+
+        function loadData() {
+            var savedWords = localStorage.getItem('savedWords');
+            return savedWords ? JSON.parse(savedWords) : [];
+        }
+
+        function saveHighlights(highlights) {
+            localStorage.setItem('highlightedWords', JSON.stringify(highlights));
+        }
+
+        function loadHighlights() {
+            var highlights = localStorage.getItem('highlightedWords');
+            return highlights ? JSON.parse(highlights) : [];
+        }
+
+        function clearData() {
+            localStorage.removeItem('savedWords');
+            localStorage.removeItem('highlightedWords');
+            location.reload();
+        }
+
+        function renderTable(words) {
+            var table = document.getElementById('wordTable');
+
+            while (table.rows.length > 1) {
+                table.deleteRow(1);
+            }
+
+            var highlightedWords = loadHighlights();
+
+            words.forEach(word => {
+                var row = table.insertRow();
+
+                // **判断是否为标题栏**
+                if (word.category) {
+                    var headerCell = row.insertCell(0);
+                    headerCell.textContent = word.category;
+                    headerCell.colSpan = 4;
+                    row.classList.add("category");
+                    return;
+                }
+
+                var chineseCell = row.insertCell(0);
+                var italianCell = row.insertCell(1);
+                var speakCell = row.insertCell(2);
+                var highlightCell = row.insertCell(3);
+
+                chineseCell.textContent = word.chinese;
+                italianCell.textContent = word.italian;
+
+                var speakButton = document.createElement('button');
+                speakButton.textContent = '🔊';
+                speakButton.onclick = function() { speak(word.italian); };
+                speakCell.appendChild(speakButton);
+
+                var highlightButton = document.createElement('button');
+                highlightButton.textContent = '⭐';
+                highlightButton.onclick = function() {
+                    row.classList.toggle('highlight');
+                    if (row.classList.contains('highlight')) {
+                        highlightedWords.push(word.italian);
+                    } else {
+                        highlightedWords = highlightedWords.filter(w => w !== word.italian);
+                    }
+                    saveHighlights(highlightedWords);
+                };
+                highlightCell.appendChild(highlightButton);
+
+                if (highlightedWords.includes(word.italian)) {
+                    row.classList.add('highlight');
+                }
+            });
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var content = e.target.result;
+                var lines = content.split(/\r?\n/);
+                var words = [];
+
+                lines.forEach(line => {
+                    if (!line.trim()) return;
+
+                    var parts = line.split(',');
+
+                    if (parts.length === 1 || (parts.length === 2 && parts[1].trim() === '')) {
+                        words.push({ category: parts[0].trim() });
+                    } else if (parts.length >= 2) {
+                        words.push({ chinese: parts[0].trim(), italian: parts[1].trim() });
+                    }
+                });
+
+                saveData(words);
+                renderTable(words);
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+
+        window.onload = function() {
+            var words = loadData();
+            renderTable(words);
+        };
+    </script>
+</body>
+</html>
